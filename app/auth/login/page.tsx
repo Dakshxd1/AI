@@ -11,27 +11,36 @@ function LoginForm() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [info, setInfo] = useState('')
+  const [debug, setDebug] = useState('')
   const router = useRouter()
   const params = useSearchParams()
 
   useEffect(() => {
-    const msg = params.get('message')
-    if (msg) setInfo(decodeURIComponent(msg))
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    setDebug(`URL: ${url ? url.slice(0,30)+'...' : 'MISSING'} | KEY: ${key ? key.slice(0,20)+'...' : 'MISSING'}`)
   }, [params])
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
     setError('')
-    const supabase = createClient()
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) {
-      setError(error.message)
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+      if (error) {
+        setError('Auth error: ' + error.message + ' (status: ' + error.status + ')')
+        setLoading(false)
+      } else if (data?.user) {
+        router.push('/chat')
+        router.refresh()
+      } else {
+        setError('No user returned - unknown error')
+        setLoading(false)
+      }
+    } catch (err: any) {
+      setError('Exception: ' + err.message)
       setLoading(false)
-    } else {
-      router.push('/chat')
-      router.refresh()
     }
   }
 
@@ -45,9 +54,9 @@ function LoginForm() {
       </div>
       <div className="bg-gray-900 border border-white/10 rounded-2xl p-6">
         <form onSubmit={handleLogin} className="space-y-4">
-          {info && (
-            <div className="bg-yellow-500/10 border border-yellow-500/20 text-yellow-300 text-sm rounded-lg px-3 py-2">
-              ⚠️ {info}
+          {debug && (
+            <div className="bg-gray-800 text-gray-400 text-xs rounded-lg px-3 py-2 break-all">
+              {debug}
             </div>
           )}
           {error && (
@@ -57,22 +66,19 @@ function LoginForm() {
           )}
           <div>
             <label className="block text-sm text-gray-400 mb-1.5">Email</label>
-            <input
-              type="email" value={email} onChange={e => setEmail(e.target.value)} required
+            <input type="email" value={email} onChange={e => setEmail(e.target.value)} required
               placeholder="you@example.com"
               className="w-full bg-gray-800 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 transition"
             />
           </div>
           <div>
             <label className="block text-sm text-gray-400 mb-1.5">Password</label>
-            <input
-              type="password" value={password} onChange={e => setPassword(e.target.value)} required
+            <input type="password" value={password} onChange={e => setPassword(e.target.value)} required
               placeholder="••••••••"
               className="w-full bg-gray-800 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 transition"
             />
           </div>
-          <button
-            type="submit" disabled={loading}
+          <button type="submit" disabled={loading}
             className="w-full py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Signing in…' : 'Sign in'}
@@ -80,8 +86,7 @@ function LoginForm() {
         </form>
       </div>
       <p className="text-center text-sm text-gray-600 mt-4">
-        No account?{' '}
-        <Link href="/auth/signup" className="text-indigo-400 hover:text-indigo-300">Sign up free</Link>
+        No account? <Link href="/auth/signup" className="text-indigo-400 hover:text-indigo-300">Sign up free</Link>
       </p>
     </div>
   )
