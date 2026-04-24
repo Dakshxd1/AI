@@ -19,27 +19,41 @@ function LoginForm() {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL
     const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
     setDebug(`URL: ${url ? url.slice(0,30)+'...' : 'MISSING'} | KEY: ${key ? key.slice(0,20)+'...' : 'MISSING'}`)
-  }, [params])
+  }, []) // ❌ REMOVE params
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
+  
+    console.log("CLICKED LOGIN")
+    console.log("EMAIL:", email)
+    console.log("PASSWORD:", password)
+  
     setLoading(true)
     setError('')
+  
     try {
       const supabase = createClient()
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+  
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+  
+      console.log("RESPONSE:", { data, error })
+  
       if (error) {
-        setError('Auth error: ' + error.message + ' (status: ' + error.status + ')')
+        setError(error.message)
         setLoading(false)
       } else if (data?.user) {
+        console.log("SUCCESS LOGIN")
         router.push('/chat')
-        router.refresh()
       } else {
-        setError('No user returned - unknown error')
+        setError('No user returned')
         setLoading(false)
       }
     } catch (err: any) {
-      setError('Exception: ' + err.message)
+      console.error("EXCEPTION:", err)
+      setError(err.message)
       setLoading(false)
     }
   }
@@ -53,7 +67,7 @@ function LoginForm() {
         <p className="text-gray-500 text-sm mt-2">Sign in to your account</p>
       </div>
       <div className="bg-gray-900 border border-white/10 rounded-2xl p-6">
-        <form onSubmit={handleLogin} className="space-y-4">
+      <form onSubmit={handleLogin} noValidate className="space-y-4">
           {debug && (
             <div className="bg-gray-800 text-gray-400 text-xs rounded-lg px-3 py-2 break-all">
               {debug}
