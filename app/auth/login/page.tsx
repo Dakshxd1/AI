@@ -1,0 +1,86 @@
+'use client'
+export const dynamic = 'force-dynamic'
+
+import { useState, useEffect } from 'react'
+import { createClient } from '@/lib/supabase'
+import { useRouter, useSearchParams } from 'next/navigation'
+import Link from 'next/link'
+
+export default function LoginPage() {
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [info, setInfo] = useState('')
+  const router = useRouter()
+  const params = useSearchParams()
+
+  useEffect(() => {
+    const msg = params.get('message')
+    if (msg) setInfo(msg)
+  }, [params])
+
+  async function handleLogin(e: React.FormEvent) {
+    e.preventDefault()
+    setLoading(true)
+    setError('')
+    const supabase = createClient()
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) { setError(error.message); setLoading(false) }
+    else router.push('/chat')
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-950 flex items-center justify-center px-4">
+      <div className="w-full max-w-sm">
+        <div className="text-center mb-8">
+          <Link href="/" className="text-2xl font-bold bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent">
+            Massai Chat
+          </Link>
+          <p className="text-gray-500 text-sm mt-2">Sign in to your account</p>
+        </div>
+
+        <div className="bg-gray-900 border border-white/10 rounded-2xl p-6">
+          <form onSubmit={handleLogin} className="space-y-4">
+            {info && (
+              <div className="bg-yellow-500/10 border border-yellow-500/20 text-yellow-300 text-sm rounded-lg px-3 py-2">
+                ⚠️ {info}. Please sign up again or sign in directly.
+              </div>
+            )}
+            {error && (
+              <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-lg px-3 py-2">
+                {error}
+              </div>
+            )}
+            <div>
+              <label className="block text-sm text-gray-400 mb-1.5">Email</label>
+              <input
+                type="email" value={email} onChange={e => setEmail(e.target.value)} required
+                placeholder="you@example.com"
+                className="w-full bg-gray-800 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 transition"
+              />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-400 mb-1.5">Password</label>
+              <input
+                type="password" value={password} onChange={e => setPassword(e.target.value)} required
+                placeholder="••••••••"
+                className="w-full bg-gray-800 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 transition"
+              />
+            </div>
+            <button
+              type="submit" disabled={loading}
+              className="w-full py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm transition disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? 'Signing in…' : 'Sign in'}
+            </button>
+          </form>
+        </div>
+        <p className="text-center text-sm text-gray-600 mt-4">
+          No account?{' '}
+          <Link href="/auth/signup" className="text-indigo-400 hover:text-indigo-300">Sign up free</Link>
+        </p>
+      </div>
+    </div>
+  )
+}
