@@ -46,7 +46,7 @@ function LoginForm() {
         setLoading(false)
       } else if (data?.user) {
         console.log("SUCCESS LOGIN")
-        router.push('/chat')
+        window.location.href = '/chat'
       } else {
         setError('No user returned')
         setLoading(false)
