@@ -25,7 +25,13 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  const { data: { session } } = await supabase.auth.getSession()
+  const {
+    data: { session },
+    error,
+  } = await supabase.auth.getSession()
+  
+  console.log("MIDDLEWARE SESSION:", session)
+  
   const user = session?.user
   
   if (!user && request.nextUrl.pathname.startsWith('/chat')) {
