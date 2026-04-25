@@ -18,6 +18,7 @@ export async function middleware(request: NextRequest) {
 
         setAll(cookiesToSet: any) {
           cookiesToSet.forEach((cookie: any) => {
+            request.cookies.set(cookie.name, cookie.value) // 🔥 CRITICAL LINE
             response.cookies.set(cookie.name, cookie.value, cookie.options)
           })
         },
