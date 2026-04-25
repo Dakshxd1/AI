@@ -121,7 +121,8 @@ export default function ChatUI({ user, initialConversations }: Props) {
         ]);
         return;
       }
-
+      console.log("TOKEN:", session?.access_token)
+      
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: {
