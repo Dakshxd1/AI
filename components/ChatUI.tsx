@@ -71,10 +71,20 @@ export default function ChatUI({ user, initialConversations }: Props) {
     setMsgs(history)
 
     try {
+      const { data: { session } } = await supabase.auth.getSession()
+
       const res = await fetch('/api/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: history, provider, conversationId: convId, userMessage: text })
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token}` // ✅ CRITICAL FIX
+        },
+        body: JSON.stringify({
+          messages: history,
+          provider,
+          conversationId: convId,
+          userMessage: text
+        })
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Error')
