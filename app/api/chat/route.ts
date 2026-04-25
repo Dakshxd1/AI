@@ -1,13 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerSupabaseClient } from '@/lib/supabase-server'
+import { createServerClient } from '@supabase/ssr'
+import { cookies, headers } from 'next/headers'
 
-const SYSTEM_PROMPT = "You are Massai, a helpful, friendly, and knowledgeable AI assistant. Give clear, well-structured responses. Use markdown formatting (code blocks, lists, headers) when it improves clarity."
+const SYSTEM_PROMPT =
+  "You are Massai, a helpful, friendly, and knowledgeable AI assistant. Give clear, well-structured responses. Use markdown formatting (code blocks, lists, headers) when it improves clarity."
 
+/* ---------------- GEMINI ---------------- */
 async function callGemini(messages: Array<{ role: string; content: string }>) {
   const key = process.env.GEMINI_API_KEY
   if (!key) throw new Error('GEMINI_API_KEY not configured')
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`
+
   const contents = messages.map(m => ({
     role: m.role === 'assistant' ? 'model' : 'user',
     parts: [{ text: m.content }]
@@ -25,12 +29,14 @@ async function callGemini(messages: Array<{ role: string; content: string }>) {
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
-    throw new Error(`Gemini error: ${err?.error?.message || res.statusText}`)
+    throw new Error(err?.error?.message || res.statusText)
   }
+
   const data = await res.json()
   return data.candidates?.[0]?.content?.parts?.[0]?.text || 'No response.'
 }
 
+/* ---------------- GROQ ---------------- */
 async function callGroq(messages: Array<{ role: string; content: string }>) {
   const key = process.env.GROQ_API_KEY
   if (!key) throw new Error('GROQ_API_KEY not configured')
@@ -39,13 +45,13 @@ async function callGroq(messages: Array<{ role: string; content: string }>) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${key}`
+      Authorization: `Bearer ${key}`
     },
     body: JSON.stringify({
       model: 'llama3-8b-8192',
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
-        ...messages.map(m => ({ role: m.role, content: m.content }))
+        ...messages
       ],
       max_tokens: 1500,
       temperature: 0.7
@@ -54,18 +60,58 @@ async function callGroq(messages: Array<{ role: string; content: string }>) {
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
-    throw new Error(`Groq error: ${err?.error?.message || res.statusText}`)
+    throw new Error(err?.error?.message || res.statusText)
   }
+
   const data = await res.json()
   return data.choices?.[0]?.message?.content || 'No response.'
 }
 
+/* ---------------- API ---------------- */
 export async function POST(req: NextRequest) {
   try {
-    const supabase = createServerSupabaseClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // ✅ GET TOKEN FROM HEADER
+    const authHeader = headers().get('authorization')
 
+    if (!authHeader) {
+      return NextResponse.json({ error: 'No token' }, { status: 401 })
+    }
+
+    const token = authHeader.replace('Bearer ', '')
+
+    // ✅ CREATE SUPABASE WITH TOKEN
+    const cookieStore = cookies()
+
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return cookieStore.getAll()
+          },
+          setAll() {},
+        },
+        global: {
+          headers: {
+            Authorization: `Bearer ${token}`, // 🔥 IMPORTANT
+          },
+        },
+      }
+    )
+
+    // ✅ GET USER
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    console.log("API USER:", user)
+
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // ✅ BODY
     const body = await req.json()
     const { messages, provider, conversationId, userMessage } = body
 
@@ -73,26 +119,45 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
     }
 
-    // Upsert conversation
+    // ✅ CREATE CONVERSATION
     let convId = conversationId
+
     if (!convId) {
-      const { data } = await supabase.from('conversations')
-        .insert({ user_id: user.id, title: userMessage.slice(0, 55), ai_provider: provider })
-        .select('id').single()
+      const { data } = await supabase
+        .from('conversations')
+        .insert({
+          user_id: user.id,
+          title: userMessage.slice(0, 55),
+          ai_provider: provider,
+        })
+        .select('id')
+        .single()
+
       convId = data?.id
     }
 
-    // Save user message
+    // ✅ SAVE USER MESSAGE
     if (convId) {
-      await supabase.from('messages').insert({ conversation_id: convId, role: 'user', content: userMessage })
+      await supabase.from('messages').insert({
+        conversation_id: convId,
+        role: 'user',
+        content: userMessage,
+      })
     }
 
-    // Get AI reply
-    const reply = provider === 'groq' ? await callGroq(messages) : await callGemini(messages)
+    // ✅ AI RESPONSE
+    const reply =
+      provider === 'groq'
+        ? await callGroq(messages)
+        : await callGemini(messages)
 
-    // Save AI reply
+    // ✅ SAVE AI MESSAGE
     if (convId) {
-      await supabase.from('messages').insert({ conversation_id: convId, role: 'assistant', content: reply })
+      await supabase.from('messages').insert({
+        conversation_id: convId,
+        role: 'assistant',
+        content: reply,
+      })
     }
 
     return NextResponse.json({ reply, conversationId: convId })
