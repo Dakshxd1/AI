@@ -10,32 +10,37 @@ async function callGemini(messages: Array<{ role: string; content: string }>) {
   const key = process.env.GEMINI_API_KEY
   if (!key) throw new Error('GEMINI_API_KEY not configured')
 
-  const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${key}`
-
-  const contents = messages.map(m => ({
-    role: m.role === 'assistant' ? 'model' : 'user',
-    parts: [{ text: m.content }]
-  }))
-
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents,
-      systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-      generationConfig: { temperature: 0.7, maxOutputTokens: 1500 }
-    })
-  })
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}))
-    throw new Error(err?.error?.message || res.statusText)
-  }
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${key}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [
+          {
+            role: "user",
+            parts: [
+              {
+                text:
+                  SYSTEM_PROMPT +
+                  "\n\n" +
+                  messages.map(m => `${m.role}: ${m.content}`).join("\n"),
+              },
+            ],
+          },
+        ],
+      }),
+    }
+  )
 
   const data = await res.json()
+
+  if (!res.ok) {
+    throw new Error(data?.error?.message || 'Gemini error')
+  }
+
   return data.candidates?.[0]?.content?.parts?.[0]?.text || 'No response.'
 }
-
 /* ---------------- GROQ ---------------- */
 async function callGroq(messages: Array<{ role: string; content: string }>) {
   const key = process.env.GROQ_API_KEY
@@ -48,22 +53,22 @@ async function callGroq(messages: Array<{ role: string; content: string }>) {
       Authorization: `Bearer ${key}`
     },
     body: JSON.stringify({
-      model: 'mixtral-8x7b-32768',
+      model: 'llama-3.3-70b-versatile', // ✅ FIXED
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
         ...messages
       ],
-      max_tokens: 1500,
-      temperature: 0.7
+      temperature: 0.7,
+      max_tokens: 1500
     })
   })
 
+  const data = await res.json()
+
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}))
-    throw new Error(err?.error?.message || res.statusText)
+    throw new Error(data?.error?.message || 'Groq error')
   }
 
-  const data = await res.json()
   return data.choices?.[0]?.message?.content || 'No response.'
 }
 
