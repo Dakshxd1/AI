@@ -1,35 +1,36 @@
-export const dynamic = 'force-dynamic'
+'use client'
 
-import { redirect } from 'next/navigation'
-import { createServerSupabaseClient } from '@/lib/supabase-server'
+import { useEffect, useState } from 'react'
+import { createClient } from '@/lib/supabase'
+import { useRouter } from 'next/navigation'
 import ChatUI from '@/components/ChatUI'
 
-export default async function ChatPage() {
-  const supabase = createServerSupabaseClient()
+export default function ChatPage() {
+  const [user, setUser] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const router = useRouter()
 
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser()
+  useEffect(() => {
+    const supabase = createClient()
 
-  console.log("SERVER USER:", user)
+    supabase.auth.getUser().then(({ data }) => {
+      if (!data.user) {
+        router.push('/auth/login')
+      } else {
+        setUser(data.user)
+      }
+      setLoading(false)
+    })
+  }, [])
 
-  // ✅ REAL PROTECTION (IMPORTANT)
-  if (!user) {
-    redirect('/auth/login')
+  if (loading) {
+    return <div className="text-white text-center mt-10">Loading...</div>
   }
-
-  const { data: conversations, error: convError } = await supabase
-    .from('conversations')
-    .select('id, title, ai_provider, created_at')
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: false })
-    .limit(30)
 
   return (
     <ChatUI
-      user={{ id: user.id, email: user.email ?? '' }}
-      initialConversations={conversations ?? []}
+      user={{ id: user.id, email: user.email }}
+      initialConversations={[]}
     />
   )
 }
