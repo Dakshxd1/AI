@@ -10,7 +10,7 @@ async function callGemini(messages: Array<{ role: string; content: string }>) {
   const key = process.env.GEMINI_API_KEY
   if (!key) throw new Error('GEMINI_API_KEY not configured')
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`
+  const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${key}`
 
   const contents = messages.map(m => ({
     role: m.role === 'assistant' ? 'model' : 'user',
@@ -48,7 +48,7 @@ async function callGroq(messages: Array<{ role: string; content: string }>) {
       Authorization: `Bearer ${key}`
     },
     body: JSON.stringify({
-      model: 'llama3-8b-8192',
+      model: 'mixtral-8x7b-32768',
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
         ...messages
