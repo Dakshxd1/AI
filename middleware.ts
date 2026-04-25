@@ -1,11 +1,8 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
-import type { CookieOptions } from '@supabase/ssr'
 
 export async function middleware(request: NextRequest) {
-  let response = NextResponse.next({
-    request,
-  })
+  let response = NextResponse.next()
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -15,31 +12,33 @@ export async function middleware(request: NextRequest) {
         getAll() {
           return request.cookies.getAll()
         },
-
-        setAll(cookiesToSet: any) {
-          cookiesToSet.forEach((cookie: any) => {
-            request.cookies.set(cookie.name, cookie.value) // 🔥 CRITICAL LINE
-            response.cookies.set(cookie.name, cookie.value, cookie.options)
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }: any) => {
+            response.cookies.set(name, value, options)
           })
         },
       },
     }
   )
 
+  // 🔥 IMPORTANT: this syncs session internally
   const {
-    data: { session },
-    error,
-  } = await supabase.auth.getSession()
-  
-  console.log("MIDDLEWARE SESSION:", session)
-  
-  const user = session?.user
-  
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  console.log("MIDDLEWARE USER:", user)
+
+  // protect routes
   if (!user && request.nextUrl.pathname.startsWith('/chat')) {
     return NextResponse.redirect(new URL('/auth/login', request.url))
   }
 
-  if (user && (request.nextUrl.pathname === '/auth/login' || request.nextUrl.pathname === '/auth/signup')) {
+  // prevent logged-in users from login page
+  if (
+    user &&
+    (request.nextUrl.pathname === '/auth/login' ||
+      request.nextUrl.pathname === '/auth/signup')
+  ) {
     return NextResponse.redirect(new URL('/chat', request.url))
   }
 
