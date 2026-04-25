@@ -1,4 +1,5 @@
 import { createBrowserClient } from '@supabase/ssr'
+import type { CookieOptions } from '@supabase/ssr'
 
 export function createClient() {
   return createBrowserClient(
@@ -6,7 +7,7 @@ export function createClient() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll() {
+        getAll(): { name: string; value: string }[] {
           return document.cookie
             .split('; ')
             .map((c) => {
@@ -14,8 +15,15 @@ export function createClient() {
               return { name, value: rest.join('=') }
             })
         },
-        setAll(cookies) {
-          cookies.forEach(({ name, value, options }) => {
+
+        setAll(
+          cookies: Array<{
+            name: string
+            value: string
+            options: CookieOptions
+          }>
+        ) {
+          cookies.forEach(({ name, value }) => {
             document.cookie = `${name}=${value}; path=/`
           })
         },
