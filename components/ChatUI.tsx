@@ -42,6 +42,7 @@ interface Props {
 export default function ChatUI({ user, initialConversations }: Props) {
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
+  const [reward, setReward] = useState(0);
   const [loading, setLoading] = useState(false);
   const [typing, setTyping] = useState(false);
   const [provider, setProvider] = useState<"gemini" | "groq">("gemini");
@@ -98,6 +99,12 @@ export default function ChatUI({ user, initialConversations }: Props) {
   const send = async () => {
     if (!input.trim() || loading) return;
     const text = input.trim();
+    // ✅ Reward logic (RL simulation)
+    if (text.toLowerCase().includes("good")) {
+      setReward((prev) => prev + 1);
+    } else if (text.toLowerCase().includes("bad")) {
+      setReward((prev) => prev - 1);
+    }
     setInput("");
     setLoading(true);
     setTyping(true);
@@ -121,8 +128,8 @@ export default function ChatUI({ user, initialConversations }: Props) {
         ]);
         return;
       }
-      console.log("TOKEN:", session?.access_token)
-      
+      console.log("TOKEN:", session?.access_token);
+
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: {
@@ -456,6 +463,9 @@ export default function ChatUI({ user, initialConversations }: Props) {
           </div>
           <p className="text-xs text-gray-700 text-center mt-1.5">
             Enter to send · Shift+Enter for new line
+          </p>
+          <p className="text-xs text-gray-500 text-center mt-1">
+            Reward Score: {reward}
           </p>
         </div>
       </div>
